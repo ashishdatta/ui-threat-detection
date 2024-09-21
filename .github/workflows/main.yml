@@ -1,0 +1,43 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main  # or your default branch name
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'  # or your preferred Node.js version
+
+    - name: Install dependencies
+      run: |
+        cd ui
+        npm ci
+
+    - name: Build project
+      run: |
+        cd ui
+        npm run build
+
+    - name: Deploy to VPS
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        HOST: ${{ secrets.HOST }}
+        USER: ${{ secrets.USER }}
+        TARGET: ${{ secrets.TARGET }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
+        rsync -avz --delete ./ui/out/ $USER@$HOST:$TARGET
+        ssh $USER@$HOST 'pm2 restart your-app-name'  # If you're using PM2 to manage your Node.js app
